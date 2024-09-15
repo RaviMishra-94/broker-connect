@@ -142,6 +142,7 @@ class OrderBookResponse:
             'message': self.message,
             'orderBook': [trade.__dict__ for trade in self.orderBook]
         }
+
 class TradeBookStructure:
     def __init__(self,
                  exchange,
@@ -443,6 +444,53 @@ class PositionResponse:
             'position': [position.__dict__ for position in self.position]
         }
     
+class FundResponse:
+    def __init__(self,
+                 dhanClientId,
+                 availabelBalance,
+                 sodLimit,
+                 collateralAmount,
+                 receiveableAmount,
+                 utilizedAmount,
+                 blockedPayoutAmount,
+                 withdrawableBalance):
+        self.dhanClientId = dhanClientId
+        self.availabelBalance = availabelBalance
+        self.sodLimit = sodLimit
+        self.collateralAmount = collateralAmount
+        self.receiveableAmount = receiveableAmount
+        self.utilizedAmount = utilizedAmount
+        self.blockedPayoutAmount = blockedPayoutAmount
+        self.withdrawableBalance = withdrawableBalance
+
+    def __repr__(self):
+        return f"""{{
+            dhanClientId={self.dhanClientId},
+            availabelBalance={self.availabelBalance},
+            sodLimit={self.sodLimit},
+            collateralAmount={self.collateralAmount},
+            receiveableAmount={self.receiveableAmount},
+            utilizedAmount={self.utilizedAmount},
+            blockedPayoutAmount={self.blockedPayoutAmount},
+            withdrawableBalance={self.withdrawableBalance}
+        }}"""
+
+    def to_dict(self):
+        return {
+            'exchange': self.exchange,
+            'symbol': self.symbol,
+            'name': self.name,
+            'multiplier': self.multiplier,
+            'buyQuantity': self.buyQuantity,
+            'sellQuantity': self.sellQuantity,
+            'buyAmount': self.buyAmount,
+            'sellAmount': self.sellAmount,
+            'buyAvgPrice': self.buyAvgPrice,
+            'sellAvgPrice': self.sellAvgPrice,
+            'netQuantity': self.netQuantity
+        }
+
+
 class ErrorResponse:
     def __init__(self,
                  status,
