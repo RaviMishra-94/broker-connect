@@ -464,7 +464,6 @@ class Dhan(object):
     @handle_parse_error
     def _parseFundResponse(self, response) -> FundResponse:
         
-        dhanClientId = response["dhanClientId"]
         availabelBalance = response["availabelBalance"]
         sodLimit = response["sodLimit"]
         collateralAmount = response["collateralAmount"]
@@ -473,7 +472,7 @@ class Dhan(object):
         blockedPayoutAmount = response["blockedPayoutAmount"]
         withdrawableBalance = response["withdrawableBalance"]
 
-        fundResponse = FundResponse(dhanClientId, availabelBalance, sodLimit, collateralAmount, receiveableAmount, utilizedAmount, blockedPayoutAmount, withdrawableBalance)
+        fundResponse = FundResponse(availabelBalance, sodLimit, collateralAmount, receiveableAmount, utilizedAmount, blockedPayoutAmount, withdrawableBalance)
         return fundResponse
    
     @handle_parse_error

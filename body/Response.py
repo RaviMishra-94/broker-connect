@@ -446,7 +446,6 @@ class PositionResponse:
     
 class FundResponse:
     def __init__(self,
-                 dhanClientId,
                  availabelBalance,
                  sodLimit,
                  collateralAmount,
@@ -454,7 +453,6 @@ class FundResponse:
                  utilizedAmount,
                  blockedPayoutAmount,
                  withdrawableBalance):
-        self.dhanClientId = dhanClientId
         self.availabelBalance = availabelBalance
         self.sodLimit = sodLimit
         self.collateralAmount = collateralAmount
@@ -465,7 +463,6 @@ class FundResponse:
 
     def __repr__(self):
         return f"""{{
-            dhanClientId={self.dhanClientId},
             availabelBalance={self.availabelBalance},
             sodLimit={self.sodLimit},
             collateralAmount={self.collateralAmount},
