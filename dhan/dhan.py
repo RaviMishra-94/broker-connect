@@ -244,8 +244,8 @@ class Dhan(object):
             return "NA"
 
     @staticmethod
-    def _getExchange(order: Order) -> str | None:
-        exch = order.exchange
+    def _getExchangeSegment(order: Order) -> str | None:
+        exch = order.segment
         if re.match(r"^(NSE_EQ|NSE_FNO|NSE_CURRENCY|BSE_EQ|BSE_FNO|BSE_CURRENCY|MCX_COMM)$", exch, re.IGNORECASE):
             return exch.upper()
         else:
@@ -253,35 +253,39 @@ class Dhan(object):
             return None
 
     def _getSecurityId(self, order):
-        formatted_symbol = self._getTradingSymbolFromOrder(order)
-        token = getSecurityIdFrom(formatted_symbol, order.exchange)
-        return "test"
+        formatted_symbol = order.tradingSymbol
+        securityId = getSecurityIdFromTradingSymbol(formatted_symbol, order.exchange)
+        return str(int(securityId))
 
     @staticmethod
     def _getTradingSymbolFromOrder(order: Order) -> str:
-        token = getSymbolFrom(order.exchange)   
+        token = getSymbolFrom(order.tradingSymbol)   
         return symbol
 
     def placeOrder(self, order: Order) -> OrderResponse:
         params = {
             "dhanClientId": self.client_id,
             "transactionType": self._getTransactionType(order),
-            "exchangeSegment": self._getExchange(order),
+            "exchangeSegment": self._getExchangeSegment(order),
             "productType": self._getProductType(order),
             "orderType": self._getOrderType(order),
             "validity": self._getDuration(order),
             "securityId": self._getSecurityId(order),
-            "quantity": str(order.quantity),
-            "disclosedQuantity": 0,
-            "price": str(order.price),
-            "triggerPrice": order.triggerPriceInitialOrder,
-            "afterMarketOrder": true,
+            "quantity": order.quantity,
+            "disclosedQuantity": order.quantity,
+            "price": order.price,
+            "triggerPrice": order.triggerPrice,
+            "afterMarketOrder": True,
             "amoTime": "OPEN",
-            "boProfitValue": order.limitPriceProfitOrder,
-            "boStopLossValue": order.stopLossPrice
+            "boProfitValue": order.price,
+            "boStopLossValue": order.price
         }
         params["correlationId"] = "3837ksdcb2362837283723" #TODO to change from front end
+        print("Place order params")
+        print(params)
         response = self._postRequest("api.order.place", params)
+        print("Place order server response")
+        print(response)
         if response.get('status'):
             response = self._parseOrderResponse(response, order)
             return response
@@ -343,9 +347,14 @@ class Dhan(object):
             return response 
 
     def getOrderBook(self) -> OrderBookResponse:
+        print("getOrderBook")
         response = self._getRequest("api.order.book")
-        if response is not None:
+        print("Response from server")
+        print(response)
+        if response is not None and type(response) == list:
             response = self._parseOrderBookResponse(response)
+            print("Success response")
+            print(response)
             return response
         else:
             '''when there is some issue in respone, 'status' key goes missing, code gives keyError 
@@ -356,13 +365,15 @@ class Dhan(object):
                 message=response.get('message', "Error occurred while fetching order status"),
                 errorCode=response.get('errorCode', response.get('errorcode', "Unknown error"))
             )
+            print("Failed response")
+            print(response)
             return response
     
     def getTradeBook(self) -> TradeBookResponse:
         print("getTradeBook")
         response = self._getRequest("api.trade.book")
         print(response)
-        if response is not None:
+        if response is not None and type(response) == list:
             response = self._parseTradeBookResponse(response)
             return response
         else:
@@ -380,8 +391,10 @@ class Dhan(object):
         print("getHolding")
         response = self._getRequest("api.holding")
         print(response)
-        if response is not None:
+        if response is not None and type(response) == list:
             response = self._parseHoldingResponse(response)
+            print("Success response")
+            print(response)
             return response
         else:
             '''when there is some issue in respone, 'status' key goes missing, code gives keyError 
@@ -392,6 +405,8 @@ class Dhan(object):
                 message=response.get('message', "Error occurred while fetching order status"),
                 errorCode=response.get('errorCode', response.get('errorcode', "Unknown error"))
             )
+            print("Failed response")
+            print(response)
             return response
 
     def getPosition(self) -> PositionResponse:
@@ -511,8 +526,8 @@ class Dhan(object):
                 orderBook.append(orderBookStructure)
 
         orderBookResponse = OrderBookResponse(
-            response["status"],
-            response["message"],
+            1,
+            "Order book fetched successfully",
             orderBook
         )
 

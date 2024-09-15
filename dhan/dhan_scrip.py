@@ -37,8 +37,10 @@ def _insert_data(cursor, table_name, data):
     query = f"INSERT INTO {table_name} VALUES ({placeholders})"
     cursor.executemany(query, data.values.tolist())
 
-def _clear_table(cursor, table_name):
-    cursor.execute(f"DELETE FROM {table_name}")
+def _clear_table():
+    conn = sqlite3.connect(_db_filename)
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE dhan_scrip_data")
 
 def store_csv_to_sqlite():
     conn = sqlite3.connect(_db_filename)
@@ -64,14 +66,15 @@ def store_csv_to_sqlite():
 
 if __name__ == "__main__":
     # Store CSV to SQLite
+    # _clear_table()
     store_csv_to_sqlite()
 
-def getSecurityIdFromTradingSymbol(symbol: str):
+def getSecurityIdFromTradingSymbol(symbol: str, exchange: str):
     conn = sqlite3.connect(_db_filename)
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT SEM_SMST_SECURITY_ID FROM dhan_scrip_data WHERE SEM_TRADING_SYMBOL like ?",
-                       [symbol])
+        cursor.execute("SELECT SEM_SMST_SECURITY_ID FROM dhan_scrip_data WHERE SEM_TRADING_SYMBOL like ? and SEM_EXM_EXCH_ID like ?",
+                       [symbol, exchange])
     except Exception as e:
         logger.error("Error in fetching data from db due to: {e}".format(e=e))
 
