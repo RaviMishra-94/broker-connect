@@ -73,7 +73,7 @@ def getSecurityIdFromTradingSymbol(symbol: str, exchange: str):
     conn = sqlite3.connect(_db_filename)
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT SEM_SMST_SECURITY_ID FROM dhan_scrip_data WHERE SEM_TRADING_SYMBOL like ? and SEM_EXM_EXCH_ID like ?",
+        cursor.execute("SELECT SEM_SMST_SECURITY_ID FROM dhan_scrip_data WHERE SEM_TRADING_SYMBOL like ? and SEM_EXM_EXCH_ID like ? and SEM_INSTRUMENT_NAME = 'EQUITY'",
                        [symbol, exchange])
     except Exception as e:
         logger.error("Error in fetching data from db due to: {e}".format(e=e))
