@@ -7,7 +7,7 @@ import logging
 import json
 
 import sys
-sys.path.append('/Users/zolo/Projects/Freelance/broker-connect')
+sys.path.append('/Users/zolo/Projects/Freelance/broker-connect') # make dynnamic
 
 from .dhan_scrip import getSecurityIdFromTradingSymbol
 

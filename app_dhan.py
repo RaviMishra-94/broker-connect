@@ -42,11 +42,11 @@ def cancel_order(request_data):
         return jsonify({"error@route": str(error), "status": 1}), 500
 
 @app.route('/order-book', methods=['POST'])
-@extract_keys('apiKey', 'jwtToken')
+@extract_keys('clientId', 'accessToken')
 def get_order_book(request_data):
     try:
-        angel_instance = AngelOne(api_key=request_data['apiKey'], access_token=request_data['jwtToken'])
-        result = angel_instance.getOrderBook()
+        dhan_instance = Dhan(client_id=request_data['clientId'], access_token=request_data['accessToken'])
+        result = dhan_instance.getOrderBook()
         return jsonify(result.to_dict())
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
@@ -77,12 +77,12 @@ def get_mutiple_order_status(request_data):
     try:
         dhan_instance = Dhan(client_id=request_data['clientId'], access_token=request_data['accessToken'])
         orderids = request_data['orderids']
-        if not isinstance(uniqueorderids, list):
+        if not isinstance(orderids, list):
             return jsonify({"error": "orderids should be a list", "status": 1}), 400
 
         results = []
         for orderid in orderids:
-            order_response = angel_instance.getOrderStatus(orderid)
+            order_response = dhan_instance.getOrderStatus(orderid)
             order_response = order_response.to_dict()
 
             if order_response is None:
