@@ -42,7 +42,6 @@ import time
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-
 @app.route('/generate-session', methods=['POST'])
 @extract_keys('apiKey', 'clientCode', 'password', 'qrValue')
 def login(request_data):

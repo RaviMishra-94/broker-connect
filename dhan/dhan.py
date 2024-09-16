@@ -14,7 +14,7 @@ from .dhan_scrip import getSecurityIdFromTradingSymbol
 # Import other necessary modules for response and order handling
 from body.Order import Order
 from body.Response import OrderResponse, OrderBookResponse, TradeBookResponse, \
-    OrderStatusResponse, HoldingResponse, PositionResponse, ErrorResponse, FundResponse
+    OrderStatusResponse, HoldingResponse, PositionResponse, ErrorResponse, FundResponse, OrderBookStructure
 from decorators import handle_parse_error
 
 log = logging.getLogger(__name__)
@@ -49,20 +49,13 @@ class Dhan(object):
     EQ= 'EQ'
 
     _rootUrl = "https://api.dhan.co"
-    client_id = ""
-    # _login_url = "https://api.dhan.co/v1/auth/login"
     _default_timeout = 7  # seconds
 
     _routes = {
-        # Authentication
-        # "api.login": "/v1/auth/login",
-        # "api.logout": "/v1/auth/logout",
-        # "api.token": "/v1/auth/token", # Token generation endpoint
-
         # Order Management
         "api.order.place": "/v2/orders",  # Place a new order
         "api.order.modify": "/v2/orders/{order-id}",  # Modify existing order
-        "api.order.cancel": "/v2/orders/{order-id}/cancel",  # Cancel order
+        "api.order.cancel": "/v2/orders/{order-id}",  # Cancel order
         "api.order.book": "/v2/orders",  # Retrieve all orders of the day
 
         # Trade Book and Positions
@@ -105,6 +98,7 @@ class Dhan(object):
     # def login_url(self):
     #     """Generate the login URL for DhanHQ login flow."""
     #     return "%s?api_key=%s" % (self._login_url, self.api_key)
+
 
     def requestHeaders(self):
         headers = {"content-type": "application/json"}
@@ -234,9 +228,8 @@ class Dhan(object):
 
     @staticmethod
     def _getLegName(order: Order) -> str:
-        """Get amo time for dhan
-            :returns 'OPEN' or 'OPEN_30' or 'OPEN_60'"""
-        legName = order.amo
+
+        legName = "NA"
         if re.match(r"^(ENTRY_LEG|STOP_LOSS_LEG|TARGET_LEG|NA)$", legName, re.IGNORECASE):
             return legName.upper()
         else:
@@ -256,7 +249,7 @@ class Dhan(object):
         formatted_symbol = order.tradingSymbol
         securityId = getSecurityIdFromTradingSymbol(formatted_symbol, order.exchange)
         return str(int(securityId))
-
+    
     @staticmethod
     def _getTradingSymbolFromOrder(order: Order) -> str:
         token = getSymbolFrom(order.tradingSymbol)   
@@ -272,15 +265,15 @@ class Dhan(object):
             "validity": self._getDuration(order),
             "securityId": self._getSecurityId(order),
             "quantity": order.quantity,
-            "disclosedQuantity": order.quantity,
-            "price": order.price,
-            "triggerPrice": order.triggerPrice,
-            "afterMarketOrder": True,
-            "amoTime": "OPEN",
-            "boProfitValue": order.price,
-            "boStopLossValue": order.price
+            "disclosedQuantity": order.discQuantity,
+            "price": int(order.price),
+            # "triggerPrice": int(order.price),
+            # "afterMarketOrder": True,
+            # "amoTime": "OPEN",
+            # "boProfitValue": order.price,
+            # "boStopLossValue": order.price
         }
-        params["correlationId"] = "3837ksdcb2362837283723" #TODO to change from front end
+        params["correlationId"] = "123abc678" #TODO to change from front end
         print("Place order params")
         print(params)
         response = self._postRequest("api.order.place", params)
@@ -303,16 +296,19 @@ class Dhan(object):
     def modifyOrder(self, order: Order, orderId: str) -> OrderResponse:
         params = {
             "dhanClientId": self.client_id,
-            "orderId": str(orderId),
+            "order-id": str(orderId),
             "orderType": self._getOrderType(order),
             "legName": self._getLegName(order),
-            "price": str(order.price),
-            "quantity": str(order.quantity),
-            "disclosedQuantity": "",
+            "price": int(order.price),
+            "quantity": order.quantity,
+            "disclosedQuantity": order.discQuantity,
             "triggerPrice": "", #Change
             "validity": self._getDuration(order),
         }
+        print("Modify order params")
+        print(params)
         response = self._putRequest("api.order.modify", params)
+        print(response)
         if response.get('status'):
             response = self._parseOrderResponse(response)
             return response
@@ -328,10 +324,14 @@ class Dhan(object):
             return response 
 
     def cancelOrder(self, orderId: str) -> OrderResponse:
+        print("cancelOrder")
         params = {
-            "orderId": str(orderId),
+            "order-id": str(orderId),
         }
+        print("Cancel order params")
+        print(params)
         response = self._deleteRequest("api.order.cancel", params)
+        print(response)
         if response.get('status'):
             response = self._parseOrderResponse(response)
             return response
@@ -444,19 +444,25 @@ class Dhan(object):
             return response 
    
     def getOrderStatus(self, orderId) -> OrderStatusResponse:
+        print("getOrderStatus of")
+        print(orderId)
         response = self._getRequest("api.order.status", {"order-id": orderId})
-        if response is not None:
-            orderStatusResponse = self._parseOrderStatusResponse(response)
+        print(response)
+        if response is not None and type(response) == list:
+            orderStatusResponse = self._parseOrderStatusResponse(response[0])
+            print("Success response")
+            print(orderStatusResponse)
             return orderStatusResponse
         else:
-            '''when there is some issue in respone, 'status' key goes missing, code gives keyError 
-               and hence the below code is written to handle it.'''
+           
             orderStatusResponse = ErrorResponse(
-                data=response.get('data', {}),
+                data={},
                 status=1,
-                message=response.get('message', "Error occurred while fetching order status"),
+                message=response.get('errorMessage', "Error occurred while fetching order status"),
                 errorCode=response.get('errorCode', response.get('errorcode', "Unknown error"))
             )
+            print("Failed response")
+            print(orderStatusResponse)
             return orderStatusResponse
     
     @handle_parse_error
@@ -502,7 +508,7 @@ class Dhan(object):
                 duration = orderDetails["validity"]
                 price = orderDetails["price"]
                 quantity = orderDetails["quantity"]
-                disclosedQuantity = orderDetails["disclosedquantity"]
+                disclosedQuantity = orderDetails["disclosedQuantity"]
                 symbol = orderDetails["tradingSymbol"]
                 transactionType = orderDetails["transactionType"]
                 exchange = orderDetails["exchangeSegment"].split('-')[0]
@@ -630,7 +636,6 @@ class Dhan(object):
     @handle_parse_error
     def _parseOrderStatusResponse(self, response) -> OrderStatusResponse:
         responseBody = response
-
         status = 1
         message = "Order fetched successfully"
 
@@ -663,4 +668,61 @@ class Dhan(object):
                                                   instrumentType, variety)
 
         return orderStatusResponse
-        
+
+class DhanAuth:
+    def __init__(self, partner_id, partner_secret, redirect_url):
+        """
+        Initialize the Dhan Auth Wrapper with partner credentials.
+        :param partner_id: Partner's ID provided by Dhan.
+        :param partner_secret: Partner's secret key provided by Dhan.
+        :param redirect_url: Partner's redirect URL for the consent flow.
+        """
+        self.partner_id = partner_id
+        self.partner_secret = partner_secret
+        self.redirect_url = redirect_url
+        self.base_url = "https://auth.dhan.co"
+    
+    def generate_consent(self):
+        """
+        Step 1: Generate the consent ID by sending partner credentials.
+        :return: consent_id or None if the request fails.
+        """
+        url = f"{self.base_url}/partner/generate-consent"
+        headers = {
+            "partner_id": self.partner_id,
+            "partner_secret": self.partner_secret
+        }
+        response = req.post(url, headers=headers)
+
+        if response.status_code == 200:
+            return response.json().get("consentId")
+        else:
+            print(f"Failed to generate consent. Status Code: {response.status_code}, Response: {response.text}")
+            return None
+    
+    def consent_login_url(self, consent_id):
+        """
+        Step 2: Generate the consent login URL to redirect the user to Dhan's login page.
+        :param consent_id: The consent ID obtained from the previous step.
+        :return: The full URL where the user should be redirected.
+        """
+        return f"{self.base_url}/consent-login?consentId={consent_id}"
+    
+    def consume_consent(self, token_id):
+        """
+        Step 3: Fetch user details using the token ID received after the user logs in.
+        :param token_id: The token ID received from the consent login step.
+        :return: User details (JSON) or None if the request fails.
+        """
+        url = f"{self.base_url}/partner/consume-consent?tokenId={token_id}"
+        headers = {
+            "partner_id": self.partner_id,
+            "partner_secret": self.partner_secret
+        }
+        response = req.get(url, headers=headers)
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print(f"Failed to consume consent. Status Code: {response.status_code}, Response: {response.text}")
+            return None
