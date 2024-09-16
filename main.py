@@ -1,28 +1,28 @@
 
-from dhan import Dhan, DhanAuth
+from dhan import Dhan
 from body.Order import Order
 
 def dhanAuthApi():
-    dhan_auth = DhanAuth(partner_id="your_partner_id", partner_secret="your_partner_secret", redirect_url="your_redirect_url")
+    dhan_auth = Dhan(partner_id="your_partner_id", partner_secret="your_partner_secret", redirect_url="your_redirect_url")
     # Step 1: Generate the consent ID
-    consent_id = dhan_auth.generate_consent()
-    # print(consent_id)
+    consentId = dhan_auth.generateConsent()
+    print(consentId)
 
-    if consent_id:
-        print(f"Consent ID: {consent_id}")
+    if consentId is not None:
+        print(f"Consent ID: {consentId}")
 
         # Step 2: Redirect user to this URL for login
-        consent_login_url = dhan_auth.consent_login_url(consent_id)
-        print(f"Redirect user to: {consent_login_url}")
+        consentLoginUrl = dhan_auth.generateConsentLoginUrl(consentId)
+        print(f"Redirect user to: {consentLoginUrl}")
         
         # After the user logs in and is redirected to your server, capture the token_id from the URL
         # Assume token_id is captured from the URL here
-        token_id = "captured_token_id_from_redirect"
+        tokenId = "captured_token_id_from_redirect"
 
         # Step 3: Fetch user details using the token_id
-        user_details = dhan_auth.consume_consent(token_id)
+        userDetails = dhan_auth.consumeConsent(tokenId)
         
-        if user_details:
+        if userDetails is not None:
             print(f"User details: {user_details}")
         else:
             print("Failed to fetch user details.")
@@ -39,7 +39,7 @@ def dhanApi():
     # dhan.getHolding()
     # dhan.getPosition()
     # dhan.getFunds()
-    # dhan.getOrderStatus(orderId)
+    dhan.getOrderStatus(orderId)
     # dhan.cancelOrder(orderId)
     order = Order(
         exchange="NSE",  # Use appropriate enum values
@@ -61,7 +61,7 @@ def dhanApi():
         # triggerPrice=0.0
     )
 
-    dhan.placeOrder(order)
+    # dhan.placeOrder(order)
     # dhan.modifyOrder(order, orderId)
 
     print(order)

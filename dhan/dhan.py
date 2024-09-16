@@ -20,38 +20,17 @@ from decorators import handle_parse_error
 log = logging.getLogger(__name__)
 
 class Dhan(object):
-
-    #declaring constants
-    NSE= 'NSE_EQ'
-    BSE= 'BSE_EQ'
-    CUR= 'NSE_CURRENCY'
-    MCX= 'MCX_COMM'
-    FNO= 'NSE_FNO'
-    INDEX= 'IDX_I'
-    NSE_FNO = 'NSE_FNO'
-    BSE_FNO = 'BSE_FNO'
-    BUY= B= 'BUY'
-    SELL= S= 'SELL'
-    CNC= 'CNC'
-    INTRA= "INTRADAY"
-    SL= "STOP_LOSS"
-    SLM= "STOP_LOSS_MARKET"
-    MARGIN= 'MARGIN'
-    CO= 'CO'
-    BO= 'BO'
-    MTF= 'MTF'
-    LIMIT= 'LIMIT'
-    MARKET= 'MARKET'
-    DAY= 'DAY'
-    IOC= 'IOC'
-    GTC= 'GTC'
-    GTD= 'GTD'
-    EQ= 'EQ'
-
     _rootUrl = "https://api.dhan.co"
+    _authUrl = "https://auth.dhan.co"
     _default_timeout = 7  # seconds
 
     _routes = {
+
+        #Authentication
+        "api.generate.consent": "/partner/generate-consent",
+        "api.consent.login": "/consent-login",
+        "api.consume.consent": "/consume-consent",
+
         # Order Management
         "api.order.place": "/v2/orders",  # Place a new order
         "api.order.modify": "/v2/orders/{order-id}",  # Modify existing order
@@ -80,14 +59,17 @@ class Dhan(object):
     userType = "USER"
     sourceID = "WEB"
 
-    def __init__(self, client_id, access_token=None, session_expiry_hook=None, debug=False, disable_ssl=False, timeout=7, proxies=None):
+    def __init__(self, partner_id=None, partner_secret=None, redirect_url=None, client_id=None, access_token=None, session_expiry_hook=None, debug=False, disable_ssl=False, timeout=7, proxies=None):
         self.access_token = access_token
         self.session_expiry_hook = session_expiry_hook
         self.debug = debug
         self.disable_ssl = disable_ssl
         self.timeout = timeout
         self.proxies = proxies
-        self.client_id= str(client_id)
+        self.client_id = client_id
+        self.partner_id = partner_id
+        self.partner_secret = partner_secret
+        self.redirect_url = redirect_url
 
     def setSessionExpiryHook(self, method):
         """Set a custom session expiry hook."""
@@ -99,6 +81,60 @@ class Dhan(object):
     #     """Generate the login URL for DhanHQ login flow."""
     #     return "%s?api_key=%s" % (self._login_url, self.api_key)
 
+    def requestAuthHeaders(self):
+        headers = {}
+        headers["partner_id"] = self.partner_id
+        headers["partner_secret"] = self.partner_secret
+        return headers
+
+    def _authRequest(self, route, method, parameters=None):
+        """Make an HTTP request"""
+        params = parameters.copy() if parameters else {}
+
+        # Build URL
+        uri = self._routes[route].format(**params)
+        url = urljoin(self._authUrl, uri)
+
+        # Custom Headers
+        headers = self.requestAuthHeaders()
+
+        # print(f"Request: {method} {url} {params} {headers}")
+
+        try:
+            # Send request
+            r = req.request(method,
+                            url,
+                            data=json.dumps(params) if method in ["POST", "PUT"] else None,
+                            params=params if method in ["GET", "DELETE"] else None,
+                            headers=headers,
+                            verify=not self.disable_ssl,
+                            allow_redirects=True,
+                            timeout=self.timeout,
+                            proxies=self.proxies)
+
+        except Exception as e:
+            log.error(f"Error occurred while making a {method} request to {url}. Headers: {headers}, Request: {params}, Response: {e}")
+            raise e
+
+        if self.debug:
+            log.debug(f"Response: {r.status_code} {r.content}")
+
+        if r.status_code == 401:
+            log.error(f"Unauthorized access: {method} request to {url}. Headers: {headers}, Request: {params}, Response Code: {r.status_code}")
+            
+            # Return a custom message with the response data
+            return {
+                "status": 0,
+                "message": "Unauthorized access - Authentication failed.",
+                "data": {}
+            }
+
+        # Parse response
+        try:
+            data = json.loads(r.content.decode("utf8"))
+        except ValueError:
+            raise Exception(f"Couldn't parse the JSON response: {r}")
+        return data
 
     def requestHeaders(self):
         headers = {"content-type": "application/json"}
@@ -106,6 +142,10 @@ class Dhan(object):
             headers["access-token"] = self.access_token
         return headers
 
+    def _getAuthRequest(self, route, params=None):
+        """Alias for sending a GET request."""
+        return self._authRequest(route, "GET", params)
+    
     def _request(self, route, method, parameters=None):
         """Make an HTTP request"""
         params = parameters.copy() if parameters else {}
@@ -255,6 +295,29 @@ class Dhan(object):
         token = getSymbolFrom(order.tradingSymbol)   
         return symbol
 
+    def generateConsent(self) -> str | None:
+        print("generateConsent")
+        response = self._getAuthRequest("api.generate.consent")
+        if response is not None:
+            if response["status"] == 0:
+                return None
+            else:
+                return response["consentId"]
+        else:
+            None
+     
+    def generateConsentLoginUrl(self, consentId: str) -> str|None:
+        return self._authUrl + self._routes["api.consent.login"] + "?consentId=" + consentId
+    
+    def consumeConsent(self, tokenId) -> dict | None:
+        response = self._getAuthRequest("api.consume.consent", {"tokenId": tokenId})
+        if response is not None and "accessToken" in response and "dhanClientId" in response:
+            return {
+                "accessToken": response["accessToken"],
+                "dhanClientId": response["dhanClientId"]
+            }
+        return None
+    
     def placeOrder(self, order: Order) -> OrderResponse:
         params = {
             "dhanClientId": self.client_id,
@@ -668,61 +731,3 @@ class Dhan(object):
                                                   instrumentType, variety)
 
         return orderStatusResponse
-
-class DhanAuth:
-    def __init__(self, partner_id, partner_secret, redirect_url):
-        """
-        Initialize the Dhan Auth Wrapper with partner credentials.
-        :param partner_id: Partner's ID provided by Dhan.
-        :param partner_secret: Partner's secret key provided by Dhan.
-        :param redirect_url: Partner's redirect URL for the consent flow.
-        """
-        self.partner_id = partner_id
-        self.partner_secret = partner_secret
-        self.redirect_url = redirect_url
-        self.base_url = "https://auth.dhan.co"
-    
-    def generate_consent(self):
-        """
-        Step 1: Generate the consent ID by sending partner credentials.
-        :return: consent_id or None if the request fails.
-        """
-        url = f"{self.base_url}/partner/generate-consent"
-        headers = {
-            "partner_id": self.partner_id,
-            "partner_secret": self.partner_secret
-        }
-        response = req.post(url, headers=headers)
-
-        if response.status_code == 200:
-            return response.json().get("consentId")
-        else:
-            print(f"Failed to generate consent. Status Code: {response.status_code}, Response: {response.text}")
-            return None
-    
-    def consent_login_url(self, consent_id):
-        """
-        Step 2: Generate the consent login URL to redirect the user to Dhan's login page.
-        :param consent_id: The consent ID obtained from the previous step.
-        :return: The full URL where the user should be redirected.
-        """
-        return f"{self.base_url}/consent-login?consentId={consent_id}"
-    
-    def consume_consent(self, token_id):
-        """
-        Step 3: Fetch user details using the token ID received after the user logs in.
-        :param token_id: The token ID received from the consent login step.
-        :return: User details (JSON) or None if the request fails.
-        """
-        url = f"{self.base_url}/partner/consume-consent?tokenId={token_id}"
-        headers = {
-            "partner_id": self.partner_id,
-            "partner_secret": self.partner_secret
-        }
-        response = req.get(url, headers=headers)
-
-        if response.status_code == 200:
-            return response.json()
-        else:
-            print(f"Failed to consume consent. Status Code: {response.status_code}, Response: {response.text}")
-            return None
