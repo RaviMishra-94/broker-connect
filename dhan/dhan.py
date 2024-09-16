@@ -77,10 +77,6 @@ class Dhan(object):
             raise ValueError("Invalid input type. Only functions are accepted")
         self.session_expiry_hook = method
 
-    # def login_url(self):
-    #     """Generate the login URL for DhanHQ login flow."""
-    #     return "%s?api_key=%s" % (self._login_url, self.api_key)
-
     def requestAuthHeaders(self):
         headers = {}
         headers["partner_id"] = self.partner_id

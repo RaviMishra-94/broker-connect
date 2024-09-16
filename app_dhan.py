@@ -9,6 +9,30 @@ import time
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
+def generate_consent_login_url(consentId):
+    dhan_instance = Dhan()
+    return dhan_instance.generateConsentLoginUrl(consentId)
+
+@app.route('/generate-consent', methods['POST'])
+@extract_keys('partner_id', 'partner_secret')
+def generate_consent(request_data):
+    try:
+        dhan_instance = Dhan(partner_id=request_data['partner_id'], partner_secret=request_data['partner_secret'])
+        consentId = dhan_instance.generateConsent()
+        return jsonify({"consentId": consentId})
+    except Exception as error:
+        return jsonify({"error@route": str(error), "status": 1}), 500
+
+@app.route('/consume-consent', methods['POST'])
+@extract_keys('partner_id', 'partner_secret')
+def consume_consent(request_data):
+    try:
+        dhan_instance = Dhan(partner_id=request_data['partner_id'], partner_secret=request_data['partner_secret'])
+        userDetails = dhan_instance.consumeConsent(request_data['token-Id'])
+        return jsonify({"dhanClientId": userDetails["dhanClientId"], "accessToken": userDetails["accessToken"]})
+    except Exception as error:
+        return jsonify({"error@route": str(error), "status": 1}), 500
+
 @app.route('/place-order', methods=['POST'])
 @extract_keys('clientId', 'accessToken', 'order')
 def place_order(request_data):
@@ -64,12 +88,12 @@ def get_trade_book(request_data):
 @app.route('/single-order-status', methods=['POST'])
 @extract_keys('clientId', 'accessToken', 'orderid')
 def get_single_order_status(request_data):
-        try:
-            dhan_instance = Dhan(client_id=request_data['clientId'], access_token=request_data['accessToken'])
-            order_response = dhan_instance.getOrderStatus(request_data['orderId'])
-            return jsonify(order_response.to_dict())
-        except Exception as error:
-            return jsonify({"error@route": str(error), "status": 1}), 500
+    try:
+        dhan_instance = Dhan(client_id=request_data['clientId'], access_token=request_data['accessToken'])
+        order_response = dhan_instance.getOrderStatus(request_data['orderId'])
+        return jsonify(order_response.to_dict())
+    except Exception as error:
+        return jsonify({"error@route": str(error), "status": 1}), 500
         
 @app.route('/order-statuses', methods=['POST'])
 @extract_keys('clientId', 'accessToken', 'orderids')
