@@ -13,7 +13,7 @@ def generate_consent_login_url(consentId):
     dhan_instance = Dhan()
     return dhan_instance.generateConsentLoginUrl(consentId)
 
-@app.route('/generate-consent', methods['POST'])
+@app.route('/generate-consent', methods=['POST'])
 @extract_keys('partner_id', 'partner_secret')
 def generate_consent(request_data):
     try:
@@ -23,7 +23,7 @@ def generate_consent(request_data):
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
 
-@app.route('/consume-consent', methods['POST'])
+@app.route('/consume-consent', methods=['POST'])
 @extract_keys('partner_id', 'partner_secret')
 def consume_consent(request_data):
     try:
