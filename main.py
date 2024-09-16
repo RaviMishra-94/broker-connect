@@ -1,0 +1,71 @@
+
+from dhan import Dhan, DhanAuth
+from body.Order import Order
+
+def dhanAuthApi():
+    dhan_auth = DhanAuth(partner_id="your_partner_id", partner_secret="your_partner_secret", redirect_url="your_redirect_url")
+    # Step 1: Generate the consent ID
+    consent_id = dhan_auth.generate_consent()
+    # print(consent_id)
+
+    if consent_id:
+        print(f"Consent ID: {consent_id}")
+
+        # Step 2: Redirect user to this URL for login
+        consent_login_url = dhan_auth.consent_login_url(consent_id)
+        print(f"Redirect user to: {consent_login_url}")
+        
+        # After the user logs in and is redirected to your server, capture the token_id from the URL
+        # Assume token_id is captured from the URL here
+        token_id = "captured_token_id_from_redirect"
+
+        # Step 3: Fetch user details using the token_id
+        user_details = dhan_auth.consume_consent(token_id)
+        
+        if user_details:
+            print(f"User details: {user_details}")
+        else:
+            print("Failed to fetch user details.")
+    else:
+        print("Failed to generate consent ID.")
+
+def dhanApi():
+    # Example usage:
+    # Instantiate the client with your API key and optionally the access token
+    orderId = '2124091657672'
+    dhan = Dhan(debug = True, access_token="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJkaGFuIiwicGFydG5lcklkIjoiIiwiZXhwIjoxNzI4OTEzNjM2LCJ0b2tlbkNvbnN1bWVyVHlwZSI6IlNFTEYiLCJ3ZWJob29rVXJsIjoiIiwiZGhhbkNsaWVudElkIjoiMTEwNDQ1Nzg5NCJ9.VisZOpiLMfImo7uXVHpmqWUr9vnRMEkxDOj7qZjT_svfjB_0VsLF6fYjt50SYYmO-XEhScph90nJTQp_WbNUvA", client_id="1104457894")
+    # dhan.getTradeBook()
+    # dhan.getOrderBook()
+    # dhan.getHolding()
+    # dhan.getPosition()
+    # dhan.getFunds()
+    # dhan.getOrderStatus(orderId)
+    # dhan.cancelOrder(orderId)
+    order = Order(
+        exchange="NSE",  # Use appropriate enum values
+        segment="NSE_EQ",  # Use appropriate enum values
+        price=0.0,
+        transactionType="BUY",  # Use appropriate enum values
+        quantity=1,
+        discQuantity=0,
+        # stopLossPrice=145.0,
+        tradingSymbol="TCS",
+        # orderVariety="NORMAL",
+        orderType="MARKET",
+        productType="INTRADAY",
+        duration="DAY"
+        # isin="US0378331005",
+        # uniqueOrderId="1234567890",
+        # validTillDate=None,  # Use a datetime object if needed
+        # AfterHours="N",
+        # triggerPrice=0.0
+    )
+
+    dhan.placeOrder(order)
+    # dhan.modifyOrder(order, orderId)
+
+    print(order)
+
+
+if __name__ == "__main__":
+    dhanAuthApi()
