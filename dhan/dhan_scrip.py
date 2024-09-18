@@ -97,13 +97,11 @@ def download_store_delete_csv():
     os.remove(_filename)
 
 
-def get_token_id_from_symbol(symbol: str, exchange: str):
+def getSecurityIdFromTradingSymbol(symbol: str, exchange: str):
     conn = sqlite3.connect(_db_filename)
     cursor = conn.cursor()
     try:
-        cursor.execute(
-            "SELECT SEM_SMST_SECURITY_ID FROM dhan_scrip_data WHERE SEM_TRADING_SYMBOL LIKE ? AND SEM_EXM_EXCH_ID = ?",
-            [symbol, exchange])
+        cursor.execute("SELECT SEM_SMST_SECURITY_ID FROM dhan_scrip_data WHERE SEM_TRADING_SYMBOL like ? and SEM_EXM_EXCH_ID like ? and SEM_INSTRUMENT_NAME = 'EQUITY'",[symbol, exchange])
     except Exception as e:
         logger.error(f"Error in fetching data from db due to: {e}")
 
@@ -132,7 +130,7 @@ if __name__ == "__main__":
     download_store_delete_csv()
 
     # Test the functions
-    print(get_token_id_from_symbol("TAPARIA", "BSE"))
-    print(get_token_id_from_symbol("SBIN", "NSE"))
-    print(get_token_id_from_symbol("NIFTY31OCT2424700CE", "NFO"))
-    print(get_token_and_exchange_from_symbol("SBIN"))
+    # print(get_token_id_from_symbol("TAPARIA", "BSE"))
+    # print(get_token_id_from_symbol("SBIN", "NSE"))
+    # print(get_token_id_from_symbol("NIFTY31OCT2424700CE", "NFO"))
+    # print(get_token_and_exchange_from_symbol("SBIN"))
