@@ -1,0 +1,29 @@
+# market order
+{
+    "apiKey": "your_api_key",
+    "jwtToken": "your_jwt_token",
+   "order": {
+       "transactionType": "BUY",
+       "exchange": "NSE",
+       "segment": "EQUITY",
+       "productType": "DELIVERY",
+       "orderType": "MARKET",
+       "price": 0,
+       "tradingSymbol": "YESBANK-EQ",
+       "quantity": 1
+   }
+ }
+
+
+# limit order
+"order": {
+        "tradingSymbol": "YESBANK",
+        "exchange": "BSE",
+        "segment": "CASH",
+        "transactionType": "BUY",
+        "orderType": "LIMIT",
+        "stopLossPrice": 0.0,
+        "quantity": "1",
+        "discQuantity": "0",
+        "price": "21"
+    }

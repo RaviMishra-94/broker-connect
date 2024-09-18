@@ -2,19 +2,20 @@ import ssl
 from urllib.parse import urljoin
 import requests as req
 import socket
-import re, uuid
+import uuid
+import re
 import logging
 import json
-
 import sys
-sys.path.append('/Users/zolo/Projects/Freelance/broker-connect') # make dynnamic
-
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from .dhan_scrip import getSecurityIdFromTradingSymbol
-
+from logzero import  logger
 # Import other necessary modules for response and order handling
 from body.Order import Order
-from body.Response import OrderResponse, OrderBookResponse, TradeBookResponse, \
-    OrderStatusResponse, HoldingResponse, PositionResponse, ErrorResponse, FundResponse, OrderBookStructure
+from body.Response import OrderResponse, OrderBookStructure, OrderBookResponse, TradeBookStructure, TradeBookResponse, \
+    OrderStatusResponse, HoldingResponseStructure, HoldingResponse, PositionResponseStructure, PositionResponse, \
+    ErrorResponse
 from decorators import handle_parse_error
 
 log = logging.getLogger(__name__)
@@ -266,10 +267,11 @@ class Dhan(object):
     def _getLegName(order: Order) -> str:
 
         legName = "NA"
+        legName = order.tradingSymbol
         if re.match(r"^(ENTRY_LEG|STOP_LOSS_LEG|TARGET_LEG|NA)$", legName, re.IGNORECASE):
             return legName.upper()
         else:
-            logger.error(f"Invalid leg name: {duration}")
+            logger.error(f"Invalid leg name: {legName}")
             return "NA"
 
     @staticmethod
@@ -286,10 +288,10 @@ class Dhan(object):
         securityId = getSecurityIdFromTradingSymbol(formatted_symbol, order.exchange)
         return str(int(securityId))
     
-    @staticmethod
-    def _getTradingSymbolFromOrder(order: Order) -> str:
-        token = getSymbolFrom(order.tradingSymbol)   
-        return symbol
+    # @staticmethod
+    # def _getTradingSymbolFromOrder(order: Order) -> str:
+    #     token = getSymbolFrom(order.tradingSymbol)   
+    #     return symbol
 
     def generateConsent(self) -> str | None:
         print("generateConsent")
@@ -342,7 +344,7 @@ class Dhan(object):
             response = self._parseOrderResponse(response, order)
             return response
         else:
-            '''when there is some issue in respone, 'status' key goes missing, code gives keyError 
+            '''when there is some issue in response, 'status' key goes missing, code gives keyError 
                and hence the below code is written to handle it.'''
             response = ErrorResponse(
                 data=response.get('data', {}),
@@ -372,7 +374,7 @@ class Dhan(object):
             response = self._parseOrderResponse(response)
             return response
         else:
-            '''when there is some issue in respone, 'status' key goes missing, code gives keyError 
+            '''when there is some issue in response, 'status' key goes missing, code gives keyError 
                and hence the below code is written to handle it.'''
             response = ErrorResponse(
                 data=response.get('data', {}),
@@ -395,7 +397,7 @@ class Dhan(object):
             response = self._parseOrderResponse(response)
             return response
         else:
-            '''when there is some issue in respone, 'status' key goes missing, code gives keyError 
+            '''when there is some issue in response, 'status' key goes missing, code gives keyError 
                and hence the below code is written to handle it.'''
             response = ErrorResponse(
                 data=response.get('data', {}),
@@ -416,7 +418,7 @@ class Dhan(object):
             print(response)
             return response
         else:
-            '''when there is some issue in respone, 'status' key goes missing, code gives keyError 
+            '''when there is some issue in response, 'status' key goes missing, code gives keyError 
                and hence the below code is written to handle it.'''
             response = ErrorResponse(
                 data=response.get('data', {}),
@@ -436,13 +438,13 @@ class Dhan(object):
             response = self._parseTradeBookResponse(response)
             return response
         else:
-            '''when there is some issue in respone, 'status' key goes missing, code gives keyError 
+            '''when there is some issue in response, 'status' key goes missing, code gives keyError 
                and hence the below code is written to handle it.'''
             response = ErrorResponse(
                 data={},
                 status=1,
                 message="Error occurred while fetching trade book",
-                errorCode=respone.status_code
+                errorCode=response.get('status_code')
             )
             return response
     
@@ -456,7 +458,7 @@ class Dhan(object):
             print(response)
             return response
         else:
-            '''when there is some issue in respone, 'status' key goes missing, code gives keyError 
+            '''when there is some issue in response, 'status' key goes missing, code gives keyError 
                and hence the below code is written to handle it.'''
             response = ErrorResponse(
                 data=response.get('data', {}),
@@ -476,7 +478,7 @@ class Dhan(object):
             response = self._parsePositionResponse(response)
             return response
         else:
-            '''when there is some issue in respone, 'status' key goes missing, code gives keyError 
+            '''when there is some issue in response, 'status' key goes missing, code gives keyError 
                and hence the below code is written to handle it.'''
             response = ErrorResponse(
                 data=response.get('data', {}),
@@ -490,7 +492,7 @@ class Dhan(object):
         print("getFunds")
         response = self._getRequest("api.funds") # fund response
         if response is not None:
-            response = self._parseFundResponse(response)
+            response = self._parseFundsResponse(response)  # match keys 
             print(response)
             return response
         else:
@@ -498,7 +500,7 @@ class Dhan(object):
                 data={},
                 status=0,
                 message="Error while fetching funds",
-                errorCode=response.status_code
+                errorCode=response.get('status_code')
             )
             return response 
    
@@ -532,28 +534,50 @@ class Dhan(object):
         """
         orderId = response["orderid"] if response["orderid"] is not None else ""
         symbol = None #Todo From DB
-        status = respone["orderStatus"]
+        status = response["orderStatus"]
         # message = response["message"] if response["status"] else "Error: " + response["errorcode"] + " " + response[
         #     "message"]
-        message = "Your order status is " + respone["status"]
+        message = "Your order status is " + response["status"]
         uniqueOrderId = 0
 
         orderResponse = OrderResponse(orderId, symbol, status, message, uniqueOrderId)
         return orderResponse
-
+    
+    @staticmethod
     @handle_parse_error
-    def _parseFundResponse(self, response) -> FundResponse:
-        
-        availabelBalance = response["availabelBalance"]
-        sodLimit = response["sodLimit"]
-        collateralAmount = response["collateralAmount"]
-        receiveableAmount = response["receiveableAmount"]
-        utilizedAmount = response["utilizedAmount"]
-        blockedPayoutAmount = response["blockedPayoutAmount"]
-        withdrawableBalance = response["withdrawableBalance"]
-
-        fundResponse = FundResponse(availabelBalance, sodLimit, collateralAmount, receiveableAmount, utilizedAmount, blockedPayoutAmount, withdrawableBalance)
-        return fundResponse
+    def _parseFundsResponse(response):
+        if response is not None and response["status"] == "success":
+            equity_margin_data = response["data"]["equity"]
+            data = {
+                "availablecash": str(equity_margin_data["available_margin"]),
+                "availableintradaypayin": str(equity_margin_data["payin_amount"]),
+                "availablelimitmargin": str(equity_margin_data["available_margin"]),
+                "collateral": "0.0000",
+                "m2mrealized": "0.0000",
+                "m2munrealized": "0.0000",
+                "net": str(equity_margin_data["available_margin"]),
+                "utiliseddebits": "0.0000",
+                "utilisedexposure": None,
+                "utilisedholdingsales": None,
+                "utilisedoptionpremium": None,
+                "utilisedpayout": None,
+                "utilisedspan": None,
+                "utilisedturnover": None
+            }
+            response = {
+                "data": data,
+                "errorcode": "",
+                "message": "SUCCESS",
+                "status": True
+            }
+        else:
+            response = {
+                "data": {},
+                "errorcode": "",
+                "message": "Error occurred while fetching funds",
+                "status": False
+            }
+        return response
    
     @handle_parse_error
     def _parseOrderBookResponse(self, response) -> OrderBookResponse:

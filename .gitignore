@@ -1,2 +1,7 @@
 .idea/
 .venv
+scrip_master.db
+__pychache__
+angelone/__pychache__
+body/__pychache__
+dhan/__pychache__
