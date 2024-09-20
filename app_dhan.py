@@ -13,7 +13,7 @@ def generate_consent_login_url(consentId):
     dhan_instance = Dhan()
     return dhan_instance.generateConsentLoginUrl(consentId)
 
-@app.route('/generate-consent', methods=['POST'])
+@app.route('/dhan/generate-consent', methods=['POST'])
 @extract_keys('partner_id', 'partner_secret')
 def generate_consent(request_data):
     try:
@@ -23,7 +23,7 @@ def generate_consent(request_data):
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
 
-@app.route('/consume-consent', methods=['POST'])
+@app.route('/dhan/consume-consent', methods=['POST'])
 @extract_keys('partner_id', 'partner_secret')
 def consume_consent(request_data):
     try:
@@ -33,7 +33,7 @@ def consume_consent(request_data):
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
 
-@app.route('/place-order', methods=['POST'])
+@app.route('/dhan/place-order', methods=['POST'])
 @extract_keys('clientId', 'accessToken', 'order')
 def place_order(request_data):
     try:
@@ -44,7 +44,7 @@ def place_order(request_data):
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
 
-@app.route('/modify-order', methods=['POST'])
+@app.route('/dhan/modify-order', methods=['POST'])
 @extract_keys('clientId', 'accessToken', 'order', 'orderId') # check which order id is required
 def modify_order(request_data):
     try:
@@ -55,7 +55,7 @@ def modify_order(request_data):
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
 
-@app.route('/cancel-order', methods=['POST'])
+@app.route('/dhan/cancel-order', methods=['POST'])
 @extract_keys('clientId', 'accessToken', 'orderId') # check which order id is required
 def cancel_order(request_data):
     try:  
@@ -65,7 +65,7 @@ def cancel_order(request_data):
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
 
-@app.route('/order-book', methods=['POST'])
+@app.route('/dhan/order-book', methods=['POST'])
 @extract_keys('clientId', 'accessToken')
 def get_order_book(request_data):
     try:
@@ -75,7 +75,7 @@ def get_order_book(request_data):
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
 
-@app.route('/trade-book', methods=['POST'])
+@app.route('/dhan/trade-book', methods=['POST'])
 @extract_keys('clientId', 'accessToken')
 def get_trade_book(request_data):
     try:
@@ -85,22 +85,22 @@ def get_trade_book(request_data):
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
    
-@app.route('/single-order-status', methods=['POST'])
-@extract_keys('clientId', 'accessToken', 'orderid')
+@app.route('/dhan/single-order-status', methods=['POST'])
+@extract_keys('clientId', 'accessToken', 'uniqueOrderId')
 def get_single_order_status(request_data):
     try:
         dhan_instance = Dhan(client_id=request_data['clientId'], access_token=request_data['accessToken'])
-        order_response = dhan_instance.getOrderStatus(request_data['orderId'])
+        order_response = dhan_instance.getOrderStatus(request_data['uniqueOrderId'])
         return jsonify(order_response.to_dict())
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
         
-@app.route('/order-statuses', methods=['POST'])
-@extract_keys('clientId', 'accessToken', 'orderids')
+@app.route('/dhan/order-statuses', methods=['POST'])
+@extract_keys('clientId', 'accessToken', 'uniqueOrderIds')
 def get_mutiple_order_status(request_data):
     try:
         dhan_instance = Dhan(client_id=request_data['clientId'], access_token=request_data['accessToken'])
-        orderids = request_data['orderids']
+        orderids = request_data['uniqueOrderIds']
         if not isinstance(orderids, list):
             return jsonify({"error": "orderids should be a list", "status": 1}), 400
 
@@ -121,7 +121,7 @@ def get_mutiple_order_status(request_data):
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
         
-@app.route('/holdings', methods=['POST'])
+@app.route('/dhan/holdings', methods=['POST'])
 @extract_keys('clientId', 'accessToken')
 def get_holdings(request_data):
     try:
@@ -131,17 +131,18 @@ def get_holdings(request_data):
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
     
-@app.route('/positions', methods=['POST'])
+@app.route('/dhan/positions', methods=['POST'])
 @extract_keys('clientId', 'accessToken')
 def get_positions(request_data):
     try:
         dhan_instance = Dhan(client_id=request_data['clientId'], access_token=request_data['accessToken'])
         result = dhan_instance.getPosition()
-        return jsonify(result.to_dict())
+        result = result.to_dict()
+        return jsonify(result)
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
 
-@app.route('/funds', methods=['POST'])
+@app.route('/dhan/funds', methods=['POST'])
 @extract_keys('clientId', 'accessToken')
 def get_funds(request_data):
     try:

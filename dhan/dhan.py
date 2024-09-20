@@ -1,6 +1,7 @@
 import ssl
 from urllib.parse import urljoin
 import requests as req
+from typing import Union
 import socket
 import uuid
 import re
@@ -40,7 +41,7 @@ class Dhan(object):
 
         # Trade Book and Positions
         "api.trade.book": "/v2/trades",  # Fetch trade book
-        "api.holding": "/v2/holdings",  # Get holdings
+        "api.holding": "/holdings",  # Get holdings
         "api.position": "/v2/positions",  # Get positions
         "api.funds": "/v2/fundlimit",  # Get fund details
         "api.order.status": "v2/orders/{order-id}" #Get order details/status
@@ -315,44 +316,44 @@ class Dhan(object):
                 "dhanClientId": response["dhanClientId"]
             }
         return None
-    
-    def placeOrder(self, order: Order) -> OrderResponse:
+
+    def placeOrder(self, order: Order) -> Union[OrderResponse, ErrorResponse]:
         params = {
             "dhanClientId": self.client_id,
-            "transactionType": self._getTransactionType(order),
-            "exchangeSegment": self._getExchangeSegment(order),
-            "productType": self._getProductType(order),
-            "orderType": self._getOrderType(order),
-            "validity": self._getDuration(order),
-            "securityId": self._getSecurityId(order),
-            "quantity": order.quantity,
-            "disclosedQuantity": order.discQuantity,
-            "price": int(order.price),
-            # "triggerPrice": int(order.price),
-            # "afterMarketOrder": True,
-            # "amoTime": "OPEN",
-            # "boProfitValue": order.price,
-            # "boStopLossValue": order.price
+            "transactionType": 'BUY',
+            "exchangeSegment": 'NSE_EQ',
+            "productType": 'INTRADAY',
+            "orderType": 'MARKET',
+            "validity": 'DAY',
+            # "securityId": self._getSecurityId(order),
+            "securityId": "11915",
+            "quantity": 1,
+            "price": 0,
+            "correlationId": "123abc678"  # TODO: Change this from front end
         }
-        params["correlationId"] = "123abc678" #TODO to change from front end
-        print("Place order params")
-        print(params)
-        response = self._postRequest("api.order.place", params)
-        print("Place order server response")
-        print(response)
-        if response.get('status'):
-            response = self._parseOrderResponse(response, order)
-            return response
-        else:
-            '''when there is some issue in response, 'status' key goes missing, code gives keyError 
-               and hence the below code is written to handle it.'''
-            response = ErrorResponse(
-                data=response.get('data', {}),
+
+        print(f"Place order params: {params}")
+
+        try:
+            response = self._postRequest("api.order.place", params)
+            print(f"Place order server response: {response}")
+
+            if response and response.get('status'):
+                return self._parseOrderResponse(response, order)
+            else:
+                return ErrorResponse(
+                    data=response.get('data', {}),
+                    status=1,
+                    message=response.get('message', "Error occurred while placing order"),
+                    errorCode=response.get('errorCode', response.get('errorcode', "Unknown error"))
+                )
+        except Exception as e:
+            return ErrorResponse(
+                data={},
                 status=1,
-                message=response.get('message', "Error occurred while fetching order status"),
-                errorCode=response.get('errorCode', response.get('errorcode', "Unknown error"))
+                message=f"Exception occurred while placing order: {str(e)}",
+                errorCode="EXCEPTION"
             )
-            return response
 
     def modifyOrder(self, order: Order, orderId: str) -> OrderResponse:
         params = {
@@ -408,14 +409,9 @@ class Dhan(object):
             return response 
 
     def getOrderBook(self) -> OrderBookResponse:
-        print("getOrderBook")
         response = self._getRequest("api.order.book")
-        print("Response from server")
-        print(response)
         if response is not None and type(response) == list:
             response = self._parseOrderBookResponse(response)
-            print("Success response")
-            print(response)
             return response
         else:
             '''when there is some issue in response, 'status' key goes missing, code gives keyError 
@@ -426,12 +422,9 @@ class Dhan(object):
                 message=response.get('message', "Error occurred while fetching order status"),
                 errorCode=response.get('errorCode', response.get('errorcode', "Unknown error"))
             )
-            print("Failed response")
-            print(response)
             return response
     
     def getTradeBook(self) -> TradeBookResponse:
-        print("getTradeBook")
         response = self._getRequest("api.trade.book")
         print(response)
         if response is not None and type(response) == list:
@@ -449,7 +442,6 @@ class Dhan(object):
             return response
     
     def getHolding(self) -> HoldingResponse:
-        print("getHolding")
         response = self._getRequest("api.holding")
         print(response)
         if response is not None and type(response) == list:
@@ -463,68 +455,60 @@ class Dhan(object):
             response = ErrorResponse(
                 data=response.get('data', {}),
                 status=1,
-                message=response.get('message', "Error occurred while fetching order status"),
+                message=response.get('message', response.get("internalErrorMessage","Error occurred while fetching order status")),
                 errorCode=response.get('errorCode', response.get('errorcode', "Unknown error"))
             )
-            print("Failed response")
-            print(response)
             return response
 
-    def getPosition(self) -> PositionResponse:
-        print("getPosition")
+    def getPosition(self) -> Union[PositionResponse, ErrorResponse]:
         response = self._getRequest("api.position")
-        print(response)
-        if response is not None:
-            response = self._parsePositionResponse(response)
-            return response
-        else:
-            '''when there is some issue in response, 'status' key goes missing, code gives keyError 
-               and hence the below code is written to handle it.'''
-            response = ErrorResponse(
-                data=response.get('data', {}),
+        print("Position response:", response)
+
+        if response is None:
+            return ErrorResponse(
+                data={},
                 status=1,
-                message=response.get('message', "Error occurred while fetching order status"),
-                errorCode=response.get('errorCode', response.get('errorcode', "Unknown error"))
+                message="Error occurred while fetching positions",
+                errorCode="NO_RESPONSE"
             )
-            return response
+
+        try:
+            return self._parsePositionResponse(response)
+        except Exception as e:
+            print(f"Error in _parsePositionResponse: {str(e)}")
+            return ErrorResponse(
+                data={},
+                status=1,
+                message=f"Error occurred while parsing position response: {str(e)}",
+                errorCode="PARSE_ERROR"
+            )
 
     def getFunds(self):
-        print("getFunds")
-        response = self._getRequest("api.funds") # fund response
+        response = self._getRequest("api.funds")  # fund response
         if response is not None:
-            response = self._parseFundsResponse(response)  # match keys 
             print(response)
-            return response
+            return self._parseFundsResponse(response)  # match keys
         else:
-            response = ErrorResponse(
-                data={},
-                status=0,
-                message="Error while fetching funds",
-                errorCode=response.get('status_code')
-            )
-            return response 
-   
-    def getOrderStatus(self, orderId) -> OrderStatusResponse:
-        print("getOrderStatus of")
-        print(orderId)
+            return {
+                "data": {},
+                "errorcode": "API_ERROR",
+                "message": "Error while fetching funds",
+                "status": False
+            }
+
+    def getOrderStatus(self, orderId) -> Union[OrderStatusResponse, ErrorResponse]:
         response = self._getRequest("api.order.status", {"order-id": orderId})
         print(response)
-        if response is not None and type(response) == list:
+        if response and isinstance(response, list) and len(response) > 0:
             orderStatusResponse = self._parseOrderStatusResponse(response[0])
-            print("Success response")
-            print(orderStatusResponse)
             return orderStatusResponse
         else:
-           
-            orderStatusResponse = ErrorResponse(
+            return ErrorResponse(
                 data={},
                 status=1,
                 message=response.get('errorMessage', "Error occurred while fetching order status"),
                 errorCode=response.get('errorCode', response.get('errorcode', "Unknown error"))
             )
-            print("Failed response")
-            print(orderStatusResponse)
-            return orderStatusResponse
     
     @handle_parse_error
     def _parseOrderResponse(self, response, order) -> OrderResponse:
@@ -542,50 +526,48 @@ class Dhan(object):
 
         orderResponse = OrderResponse(orderId, symbol, status, message, uniqueOrderId)
         return orderResponse
-    
+
     @staticmethod
     @handle_parse_error
     def _parseFundsResponse(response):
-        if response is not None and response["status"] == "success":
-            equity_margin_data = response["data"]["equity"]
+        if response:
             data = {
-                "availablecash": str(equity_margin_data["available_margin"]),
-                "availableintradaypayin": str(equity_margin_data["payin_amount"]),
-                "availablelimitmargin": str(equity_margin_data["available_margin"]),
-                "collateral": "0.0000",
+                "availablecash": str(response["availabelBalance"]),
+                "availableintradaypayin": str(response["availabelBalance"]),
+                "availablelimitmargin": str(response["availabelBalance"]),
+                "collateral": str(response["collateralAmount"]),
                 "m2mrealized": "0.0000",
                 "m2munrealized": "0.0000",
-                "net": str(equity_margin_data["available_margin"]),
-                "utiliseddebits": "0.0000",
+                "net": str(response["withdrawableBalance"]),
+                "utiliseddebits": str(response["utilizedAmount"]),
                 "utilisedexposure": None,
                 "utilisedholdingsales": None,
                 "utilisedoptionpremium": None,
-                "utilisedpayout": None,
+                "utilisedpayout": str(response["blockedPayoutAmount"]),
                 "utilisedspan": None,
                 "utilisedturnover": None
             }
-            response = {
+            return {
                 "data": data,
                 "errorcode": "",
                 "message": "SUCCESS",
-                "status": True
+                "status": 0
             }
         else:
-            response = {
+            return {
                 "data": {},
-                "errorcode": "",
+                "errorcode": "NO_RESPONSE",
                 "message": "Error occurred while fetching funds",
-                "status": False
+                "status": 1
             }
-        return response
-   
+
     @handle_parse_error
     def _parseOrderBookResponse(self, response) -> OrderBookResponse:
         orderBook = []
 
-        if (response is not None):
+        if response is not None:
             for orderDetails in response:
-                variety = None
+                variety = None  # Not provided in the response
                 orderType = orderDetails["orderType"]
                 productType = orderDetails["productType"]
                 duration = orderDetails["validity"]
@@ -594,28 +576,43 @@ class Dhan(object):
                 disclosedQuantity = orderDetails["disclosedQuantity"]
                 symbol = orderDetails["tradingSymbol"]
                 transactionType = orderDetails["transactionType"]
-                exchange = orderDetails["exchangeSegment"].split('-')[0]
+                exchange = orderDetails["exchangeSegment"].split('_')[0]  # Changed from '-' to '_'
                 averagePrice = orderDetails["averageTradedPrice"]
-                filledShares = None
-                unfilledShares = None
+                filledShares = orderDetails["filledQty"]
+                unfilledShares = orderDetails["remainingQuantity"]
                 orderId = orderDetails["orderId"]
                 orderStatus = orderDetails["orderStatus"]
-                orderStatusMessage = orderDetails["orderStatus"]
+                orderStatusMessage = orderDetails[
+                    "omsErrorDescription"]  # Changed from orderStatus to omsErrorDescription
                 orderUpdateTime = orderDetails["updateTime"]
-                lotsize = None
-                optionType = None
-                instrumentType = None
-                uniqueOrderId = None
+                lotsize = None  # Not provided in the response
+                optionType = orderDetails["drvOptionType"]
+                instrumentType = None  # Not provided in the response
+                uniqueOrderId = orderDetails["exchangeOrderId"]  # Using exchangeOrderId as uniqueOrderId
 
-                orderBookStructure = OrderBookStructure(variety, orderType, productType, duration, price,
-                                                        quantity, disclosedQuantity, symbol, transactionType,
-                                                        exchange, averagePrice, filledShares, unfilledShares,
-                                                        orderId, orderStatus, orderStatusMessage, orderUpdateTime,
-                                                        lotsize, optionType, instrumentType, uniqueOrderId)
+                # Additional fields that you might want to include
+                correlationId = orderDetails["correlationId"]
+                createTime = orderDetails["createTime"]
+                exchangeTime = orderDetails["exchangeTime"]
+                triggerPrice = orderDetails["triggerPrice"]
+
+                orderBookStructure = OrderBookStructure(
+                    variety, orderType, productType, duration, price,
+                    quantity, disclosedQuantity, symbol, transactionType,
+                    exchange, averagePrice, filledShares, unfilledShares,
+                    orderId, orderStatus, orderStatusMessage, orderUpdateTime,
+                    lotsize, optionType, instrumentType, uniqueOrderId
+                )
+
+                # orderBookStructure.correlationId = correlationId
+                # orderBookStructure.createTime = createTime
+                # orderBookStructure.exchangeTime = exchangeTime
+                # orderBookStructure.triggerPrice = triggerPrice
+
                 orderBook.append(orderBookStructure)
 
         orderBookResponse = OrderBookResponse(
-            1,
+            0,
             "Order book fetched successfully",
             orderBook
         )
@@ -625,28 +622,52 @@ class Dhan(object):
     @handle_parse_error
     def _parseTradeBookResponse(self, response) -> TradeBookResponse:
         tradeBook = []
-        if (response is not None):
+        if response is not None:
             for tradeDetails in response:
                 print(tradeDetails)
-                exchange = tradeDetails["exchangeOrderId"]
+                exchange = tradeDetails["exchangeSegment"].split('_')[0]  # Extracting exchange from exchangeSegment
                 productType = tradeDetails["productType"]
                 symbol = tradeDetails["tradingSymbol"]
-                multiplier = tradeDetails["multiplier"]
+                multiplier = 1
                 transactionType = tradeDetails["transactionType"]
-                price = tradeDetails["tradedPrice"],
-                filledShares = None,
-                orderId = tradeDetails["orderId"],
-                quantity = tradeDetails["tradedQuantity"],
-                unfilledShares = None
+                price = tradeDetails["tradedPrice"]
+                filledShares = tradeDetails["tradedQuantity"]
+                orderId = tradeDetails["orderId"]
+                quantity = tradeDetails["tradedQuantity"]
+                unfilledShares = 0
+
+                # Additional fields that might be useful
+                # exchangeOrderId = tradeDetails["exchangeOrderId"]
+                # exchangeTradeId = tradeDetails["exchangeTradeId"]
+                # orderType = tradeDetails["orderType"]
+                # createTime = tradeDetails["createTime"]
+                # updateTime = tradeDetails["updateTime"]
+                # exchangeTime = tradeDetails["exchangeTime"]
 
                 tradeBookStructure = TradeBookStructure(
-                    exchange, productType, symbol, multiplier, transactionType, price,
-                    filledShares, orderId, quantity, unfilledShares
+                    exchange=exchange,
+                    productType=productType,
+                    symbol=symbol,
+                    multiplier=multiplier,
+                    transactionType=transactionType,
+                    price=price,
+                    filledShares=filledShares,
+                    orderId=orderId,
+                    quantity=quantity,
+                    unfilledShares=unfilledShares
                 )
+
+                # tradeBookStructure.exchangeOrderId = exchangeOrderId
+                # tradeBookStructure.exchangeTradeId = exchangeTradeId
+                # tradeBookStructure.orderType = orderType
+                # tradeBookStructure.createTime = createTime
+                # tradeBookStructure.updateTime = updateTime
+                # tradeBookStructure.exchangeTime = exchangeTime
+
                 tradeBook.append(tradeBookStructure)
 
         tradeBookResponse = TradeBookResponse(
-            "SUCCESS",
+            0,
             "Trade book successfully fetched",
             tradeBook
         )
@@ -687,67 +708,91 @@ class Dhan(object):
 
     @handle_parse_error
     def _parsePositionResponse(self, response) -> PositionResponse:
-        position = []
-        if (response is not None):
-            for positionDetails in response:
-                exchange = positionDetails["exchangeSegment"].split("_")[0]
-                symbol = positionDetails["tradingSymbol"]
-                name = positionDetails["symbolname"] # TODO from Db
-                multiplier = positionDetails["multiplier"]
-                buyQuantity = positionDetails["buyQty"]
-                sellQuantity = positionDetails["sellQty"]
-                buyAmount = positionDetails["buyAvg"]
-                sellAmount = positionDetails["sellAvg"]
-                buyAvgPrice = positionDetails["buyAvg"]
-                sellAvgPrice = positionDetails["sellAvg"]
-                netQuantity = positionDetails["netQty"]
+        positions = []
+        if not isinstance(response, list):
+            raise ValueError("Expected response to be a list")
 
-                positionResponseStructure = PositionResponseStructure(
-                    exchange, symbol, name, multiplier, buyQuantity, sellQuantity, buyAmount,
-                    sellAmount, buyAvgPrice, sellAvgPrice, netQuantity
+        for positionDetails in response:
+            try:
+                position = PositionResponseStructure(
+                    exchange=positionDetails["exchangeSegment"].split("_")[0],
+                    symbol=positionDetails["tradingSymbol"],
+                    name=positionDetails.get("symbolname", positionDetails["tradingSymbol"]),
+                    multiplier=positionDetails["multiplier"],
+                    buyQuantity=positionDetails["buyQty"],
+                    sellQuantity=positionDetails["sellQty"],
+                    buyAmount=positionDetails["dayBuyValue"],
+                    sellAmount=positionDetails["daySellValue"],
+                    buyAvgPrice=positionDetails["buyAvg"],
+                    sellAvgPrice=positionDetails["sellAvg"],
+                    netQuantity=positionDetails["netQty"]
                 )
-                position.append(positionResponseStructure)
+                positions.append(position)
+            except KeyError as e:
+                print(f"Missing key in position details: {str(e)}")
+                continue
 
-        positionResponse = PositionResponse(
-            1,
-            "Positions fetched successfully",
-            position
+        return PositionResponse(
+            status=0,
+            message="Positions fetched successfully",
+            position=positions
         )
-
-        return positionResponse
 
     @handle_parse_error
     def _parseOrderStatusResponse(self, response) -> OrderStatusResponse:
-        responseBody = response
         status = 1
         message = "Order fetched successfully"
 
-        price = responseBody["price"]
-        quantity = responseBody["quantity"]
-        symbol = responseBody["tradingSymbol"]
-        exchange = responseBody["exchangeSegment"].split("_")[0]
-        filledShares = None
-        unfilledShares = None
-        orderId = responseBody["orderId"]
-        orderStatus = responseBody["orderStatus"]
-        orderStatusMessage = responseBody["omsErrorDescription"] # message in case of rejected
-        orderUpdateTime = responseBody["updateTime"]
-        uniqueOrderId = None
-        orderType = responseBody["orderType"]
-        productType = responseBody["productType"]
-        duration = responseBody["validity"]
-        disclosedQuantity = responseBody["disclosedQuantity"]
-        transactionType = responseBody["transactionType"]
-        averagePrice = responseBody["averageTradedPrice"]
-        lotsize = None
-        optionType = responseBody["drvOptionType"]
-        instrumentType = None
-        variety = None
+        price = response["price"]
+        quantity = response["quantity"]
+        symbol = response["tradingSymbol"]
+        exchange = response["exchangeSegment"].split("_")[0]
+        filledShares = response["filledQty"]
+        unfilledShares = response["remainingQuantity"]
+        orderId = response["orderId"]
+        orderStatus = response["orderStatus"]
+        orderStatusMessage = response["omsErrorDescription"]
+        orderUpdateTime = response["updateTime"]
+        uniqueOrderId = orderId  # Set uniqueOrderId equal to orderId
+        orderType = response["orderType"]
+        productType = response["productType"]
+        duration = response["validity"]
+        disclosedQuantity = response["disclosedQuantity"]
+        transactionType = response["transactionType"]
+        averagePrice = response["averageTradedPrice"]
+        lotsize = None  # Not provided in the response
+        optionType = response["drvOptionType"]
+        instrumentType = None  # Not provided in the response
+        variety = None  # Not provided in the response
 
-        orderStatusResponse = OrderStatusResponse(status, message, price, quantity, symbol, exchange, filledShares,
-                                                  unfilledShares, orderId, orderStatus, orderStatusMessage,
-                                                  orderUpdateTime, uniqueOrderId, orderType, productType, duration,
-                                                  disclosedQuantity, transactionType, averagePrice, lotsize, optionType,
-                                                  instrumentType, variety)
+        correlationId = response.get("correlationId")
+        if correlationId:
+            message += f" (Correlation ID: {correlationId})"
+
+        orderStatusResponse = OrderStatusResponse(
+            status=status,
+            message=message,
+            price=price,
+            quantity=quantity,
+            symbol=symbol,
+            exchange=exchange,
+            filledShares=filledShares,
+            unfilledShares=unfilledShares,
+            orderId=orderId,
+            orderStatus=orderStatus,
+            orderStatusMessage=orderStatusMessage,
+            orderUpdateTime=orderUpdateTime,
+            uniqueOrderId=uniqueOrderId,
+            orderType=orderType,
+            productType=productType,
+            duration=duration,
+            disclosedQuantity=disclosedQuantity,
+            transactionType=transactionType,
+            averagePrice=averagePrice,
+            lotsize=lotsize,
+            optionType=optionType,
+            instrumentType=instrumentType,
+            variety=variety
+        )
 
         return orderStatusResponse
