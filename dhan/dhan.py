@@ -18,6 +18,7 @@ from body.Response import OrderResponse, OrderBookStructure, OrderBookResponse, 
     OrderStatusResponse, HoldingResponseStructure, HoldingResponse, PositionResponseStructure, PositionResponse, \
     ErrorResponse
 from decorators import handle_parse_error
+from datetime import datetime, timezone
 
 log = logging.getLogger(__name__)
 
@@ -244,13 +245,19 @@ class Dhan(object):
 
     @staticmethod
     def _getDuration(order: Order) -> str:
-        """Get duration for angel one
-            :returns 'DAY' or 'IOC'"""
-        duration = order.duration
-        if re.match(r"^(DAY|IOC)$", duration, re.IGNORECASE):
-            return duration.upper()
+        """
+        Get duration for Dhan order.
+
+        :param order: The order object containing the duration
+        :returns: 'DAY', 'IOC', 'GTC', or 'GTD'
+        """
+        allowed_durations = ['DAY', 'IOC', 'GTC', 'GTD']
+        duration = order.duration.upper()
+
+        if duration in allowed_durations:
+            return duration
         else:
-            logger.error(f"Invalid duration: {duration}")
+            logger.error(f"Invalid duration: {duration}. Defaulting to 'DAY'.")
             return "DAY"
 
     @staticmethod
@@ -284,15 +291,56 @@ class Dhan(object):
             logger.error(f"Invalid exchange: {exch}")
             return None
 
+    @staticmethod
+    def _format_trading_symbol(symbol: str) -> str:
+        """
+        Remove '-EQ', '-BE', or '-BL' from the end of the trading symbol.
+
+        :param symbol: The original trading symbol
+        :return: The formatted trading symbol
+        """
+        suffixes_to_remove = ['-EQ', '-BE', '-BL']
+        for suffix in suffixes_to_remove:
+            if symbol.endswith(suffix):
+                return symbol[:-len(suffix)]
+        return symbol
+
     def _getSecurityId(self, order):
-        formatted_symbol = order.tradingSymbol
-        securityId = getSecurityIdFromTradingSymbol(formatted_symbol, order.exchange)
-        return str(int(securityId))
-    
-    # @staticmethod
-    # def _getTradingSymbolFromOrder(order: Order) -> str:
-    #     token = getSymbolFrom(order.tradingSymbol)   
-    #     return symbol
+        symbol = order.tradingSymbol
+        formatted_symbol = self._format_trading_symbol(symbol)
+        security_id = getSecurityIdFromTradingSymbol(formatted_symbol.upper(), order.exchange.upper(), order.segment.upper())
+        return security_id
+
+    @staticmethod
+    def _get_exchange_segment(order):
+        """
+        Convert exchange and segment to the format required by Dhan API.
+
+        :param order
+        :return: The formatted exchange segment string
+        """
+        exchange = order.exchange.upper()
+        segment = order.segment.upper()
+
+        if exchange == "NSE":
+            if segment == "EQUITY":
+                return "NSE_EQ"
+            elif segment == "FNO":
+                return "NSE_FNO"
+            elif segment == "CURRENCY":
+                return "NSE_CURRENCY"
+        elif exchange == "BSE":
+            if segment == "EQUITY":
+                return "BSE_EQ"
+            elif segment == "FNO":
+                return "BSE_FNO"
+            elif segment == "CURRENCY":
+                return "BSE_CURRENCY"
+        elif exchange == "MCX" and segment == "COMMODITY":
+            return "MCX_COMM"
+
+        raise ValueError(f"Invalid exchange-segment combination: {exchange}-{segment}")
+
 
     def generateConsent(self) -> str | None:
         print("generateConsent")
@@ -317,27 +365,44 @@ class Dhan(object):
             }
         return None
 
+    def _get_correlation_id(self, order: Order) -> str:
+        """
+        Generate a correlation ID for the order.
+
+        :param order: The order object
+        :return: A correlation ID string of maximum 25 characters
+        """
+        current_time = datetime.now(timezone.utc)
+        formatted_time = current_time.strftime("%Y%m%d%H%M%S%f")
+        full_id = f"{formatted_time}_{order.tradingSymbol}_{self.client_id}"
+        return full_id[-25:]
+
     def placeOrder(self, order: Order) -> Union[OrderResponse, ErrorResponse]:
         params = {
             "dhanClientId": self.client_id,
-            "transactionType": 'BUY',
-            "exchangeSegment": 'NSE_EQ',
-            "productType": 'INTRADAY',
-            "orderType": 'MARKET',
-            "validity": 'DAY',
-            # "securityId": self._getSecurityId(order),
-            "securityId": "11915",
-            "quantity": 1,
-            "price": 0,
-            "correlationId": "123abc678"  # TODO: Change this from front end
+            "correlationId": self._get_correlation_id(order),
+            "exchangeSegment": self._get_exchange_segment(order),
+            "transactionType": self._getTransactionType(order),
+            "productType": self._getProductType(order),
+            "orderType": self._getOrderType(order),
+            "validity": self._getDuration(order),
+            "tradingSymbol": order.tradingSymbol,
+            "securityId": self._getSecurityId(order),
+            "quantity": int(order.quantity),
+            "price": float(order.price),
+            "disclosedQuantity": int(order.discQuantity),
+            "triggerPrice": int(order.triggerPrice),
         }
-
-        print(f"Place order params: {params}")
+            # "afterMarketOrder": true,  # these are to be used for when amo and derivatives are run
+            # "amoTime": "OPEN",
+            # "boProfitValue": -3.402823669209385e+38,
+            # "boStopLossValue": -3.402823669209385e+38,
+            # "drvExpiryDate": "string",
+            # "drvOptionType": "CALL",
+            # "drvStrikePrice": -3.402823669209385e+38
 
         try:
             response = self._postRequest("api.order.place", params)
-            print(f"Place order server response: {response}")
-
             if response and response.get('status'):
                 return self._parseOrderResponse(response, order)
             else:
