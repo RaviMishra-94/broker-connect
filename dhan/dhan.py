@@ -45,7 +45,12 @@ class Dhan(object):
         "api.holding": "/holdings",  # Get holdings
         "api.position": "/v2/positions",  # Get positions
         "api.funds": "/v2/fundlimit",  # Get fund details
-        "api.order.status": "v2/orders/{order-id}" #Get order details/status
+        "api.order.status": "v2/orders/{order-id}", #Get order details/status
+
+        #EDIS
+        "api.generate.tpin": "edis/tpin",
+        "api.enter.tpin": "edis/form"
+
     }
 
     # Fetching local and public IP addresses and MAC address of the device
@@ -162,6 +167,8 @@ class Dhan(object):
 
         if self.debug:
             log.debug(f"Request: {method} {url} {params} {headers}")
+
+        print(f"Request: {method} {url} {params} {headers}")
 
         try:
             # Send request
@@ -341,7 +348,6 @@ class Dhan(object):
 
         raise ValueError(f"Invalid exchange-segment combination: {exchange}-{segment}")
 
-
     def generateConsent(self) -> str | None:
         print("generateConsent")
         response = self._getAuthRequest("api.generate.consent")
@@ -475,6 +481,7 @@ class Dhan(object):
 
     def getOrderBook(self) -> OrderBookResponse:
         response = self._getRequest("api.order.book")
+        print(response)
         if response is not None and type(response) == list:
             response = self._parseOrderBookResponse(response)
             return response
@@ -508,7 +515,6 @@ class Dhan(object):
     
     def getHolding(self) -> HoldingResponse:
         response = self._getRequest("api.holding")
-        print(response)
         if response is not None and type(response) == list:
             response = self._parseHoldingResponse(response)
             print("Success response")
@@ -574,7 +580,13 @@ class Dhan(object):
                 message=response.get('errorMessage', "Error occurred while fetching order status"),
                 errorCode=response.get('errorCode', response.get('errorcode', "Unknown error"))
             )
-    
+
+    # def generateTpin(self):
+    #     response = self._getRequest("api.edis.tpin")
+    #     if response is not None:
+    #         print(response)
+    #         return
+
     @handle_parse_error
     def _parseOrderResponse(self, response, order) -> OrderResponse:
         """Parse the order response from the angelOne platform
@@ -764,8 +776,8 @@ class Dhan(object):
             )
 
         holdingResponse = HoldingResponse(
-            0 if response["status"] else 1,
-            response["message"],
+            0,
+            "Holdings successfully fetched",
             holding
         )
 
