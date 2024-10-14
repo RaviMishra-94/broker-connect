@@ -50,7 +50,6 @@ class Dhan(object):
         #EDIS
         "api.generate.tpin": "edis/tpin",
         "api.enter.tpin": "edis/form"
-
     }
 
     # Fetching local and public IP addresses and MAC address of the device
@@ -190,17 +189,26 @@ class Dhan(object):
             log.debug(f"Response: {r.status_code} {r.content}")
 
         # Parse response
-        if r.headers.get("Content-Type") == "application/json":
-            try:
-                data = json.loads(r.content.decode("utf8"))
-            except ValueError:
-                raise Exception(f"Couldn't parse the JSON response: {r.content}")
-            return data
-        elif r.headers.get("Content-Type") == "text/csv":
-            return r.content
-        else:
-            raise Exception(f"Unknown Content-Type ({r.headers.get('Content-Type')}) with response: ({r.content})")
+        if r.status_code in [200, 202]:  # Handle 200 (OK) and 202 (Accepted) as success
+            content_type = r.headers.get("Content-Type")
 
+            if content_type == "application/json":
+                try:
+                    data = json.loads(r.content.decode("utf8"))
+                except ValueError:
+                    raise Exception(f"Couldn't parse the JSON response: {r.content}")
+                return data
+            elif content_type == "text/csv":
+                return r.content
+            elif content_type is None:
+                # Handle no content-type (possibly empty or plain text)
+                if not r.content:
+                    return "No content in response"  # If the body is empty
+                return r.content.decode("utf8")  # Return the raw content as text if it's not empty
+            else:
+                raise Exception(f"Unknown Content-Type ({content_type}) with response: ({r.content})")
+        else:
+            raise Exception(f"Request failed with status code: {r.status_code}, response: {r.content}")
     def _deleteRequest(self, route, params=None):
         """Alias for sending a DELETE request."""
         return self._request(route, "DELETE", params)
@@ -581,11 +589,23 @@ class Dhan(object):
                 errorCode=response.get('errorCode', response.get('errorcode', "Unknown error"))
             )
 
-    # def generateTpin(self):
-    #     response = self._getRequest("api.edis.tpin")
-    #     if response is not None:
-    #         print(response)
-    #         return
+    def generateTpin(self):
+        response = self._getRequest("api.generate.tpin")
+        if response is not None:
+            # Check if the response has a status code 202
+            return {
+                    "data": {},
+                    "errorcode": None,
+                    "message": "Request accepted",
+                    "status": True
+            }
+        else:
+            return {
+                "data": {},
+                "errorcode": "API_ERROR",
+                "message": "Error while fetching funds",
+                "status": False
+            }
 
     @handle_parse_error
     def _parseOrderResponse(self, response, order) -> OrderResponse:

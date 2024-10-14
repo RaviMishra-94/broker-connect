@@ -152,5 +152,17 @@ def get_funds(request_data):
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
 
+
+@app.route('/dhan/tpin', methods=['POST'])
+@extract_keys('clientId', 'accessToken')
+def generate_tpin(request_data):
+    try:
+        dhan_instance = Dhan(access_token=request_data['accessToken'])
+        result = dhan_instance.generateTpin()
+        print(result)
+        return jsonify(result)
+    except Exception as error:
+        return jsonify({"error@route": str(error), "status": 1}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)
