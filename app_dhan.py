@@ -164,5 +164,18 @@ def generate_tpin(request_data):
     except Exception as error:
         return jsonify({"error@route": str(error), "status": 1}), 500
 
+
+@app.route('/dhan/verify/tpin', methods=['POST'])
+@extract_keys('clientId', 'accessToken', 'isin')
+def verify_tpin(request_data):
+    try:
+        dhan_instance = Dhan(access_token=request_data['accessToken'])
+        isin = request_data.get('isin', "")
+        result = dhan_instance.enter_tpin(isin)
+        print(result)
+        return jsonify({"edisFormHtml": result})
+    except Exception as error:
+        return jsonify({"error@route": str(error), "status": 1}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)

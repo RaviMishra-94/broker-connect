@@ -523,6 +523,8 @@ class Dhan(object):
     
     def getHolding(self) -> HoldingResponse:
         response = self._getRequest("api.holding")
+        print("getHolding: response")
+        print(response)
         if response is not None and type(response) == list:
             response = self._parseHoldingResponse(response)
             print("Success response")
@@ -606,6 +608,21 @@ class Dhan(object):
                 "message": "Error while fetching funds",
                 "status": False
             }
+
+
+    def enter_tpin(self, isin: str) ->  str | None:
+        params = {
+            "isin":isin,
+            "qty": 1,
+            "exchange": "NSE",
+            "segment": "EQ",
+            "bulk": True
+        }
+        response = self._postRequest("api.enter.tpin", params)
+        if response is not None:
+            return response["edisFormHtml"]
+        else:
+            None
 
     @handle_parse_error
     def _parseOrderResponse(self, response, order) -> OrderResponse:
@@ -781,10 +798,11 @@ class Dhan(object):
                 quantity = holdingDetails["totalQty"]
                 ltp = None 
                 pnl = None
-                avgPrice = holdingDetails["avgCostPrice"]
+                avgPrice = holdingDetails["avgCostPrice"],
+                isin = holdingDetails["isin"]
 
                 holdingStructure = HoldingResponseStructure(
-                    symbol, exchange, quantity, ltp, pnl, avgPrice
+                    symbol, exchange, quantity, ltp, pnl, avgPrice, isin
                 )
                 holding.append(holdingStructure)
 

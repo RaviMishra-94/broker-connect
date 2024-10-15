@@ -323,13 +323,15 @@ class HoldingResponseStructure:
                  quantity,
                  ltp,
                  pnl,
-                 avgPrice):
+                 avgPrice,
+                 isin):
         self.symbol = symbol
         self.exchange = exchange
         self.quantity = quantity
         self.ltp = ltp
         self.pnl = pnl
         self.avgPrice = avgPrice
+        self.isin = isin
 
     def __repr__(self):
         return f"""{{
@@ -338,7 +340,9 @@ class HoldingResponseStructure:
             quantity={self.quantity},
             ltp={self.ltp},
             pnl={self.pnl},
-            avgPrice={self.avgPrice}
+            avgPrice={self.avgPrice},
+            isin={self.isin}
+            
         }}"""
 
     def to_dict(self):
@@ -486,7 +490,6 @@ class FundResponse:
             'sellAvgPrice': self.sellAvgPrice,
             'netQuantity': self.netQuantity
         }
-
 
 class ErrorResponse:
     def __init__(self,
